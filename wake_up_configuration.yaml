@@ -1,0 +1,89 @@
+blueprint:
+  name: Wake Up Time Configuration
+  description: Set up alarm, heating, lighting etc based on datetime alarm.
+  domain: automation
+  input:
+    wake_up_datetime_entity:
+      name: Wake Up Time
+      selector:
+        entity:
+          domain: input_datetime
+    sleep_time_target:
+      name: Sleep Time Target
+      selector:
+        entity:
+          domain: input_datetime
+    gentle_wakeup_time_target:
+      name: Wake Up Target
+      selector:
+        entity:
+          domain: input_datetime
+    preheat_time_target:
+      name: Preheat Time Target
+      selector:
+        entity:
+          domain: input_datetime
+    sleep_offset:
+      name: Sleep Offset Time
+      description: Time from automation trigger to leave until night-time.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: minutes
+    gentle_wakeup_offset:
+      name: Gentle Wakeup Time
+      description: Time before the alarm to start the gentle wakeup.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: minutes
+    preheat_offset:
+      name: Preheat Time
+      description: Time before the alarm to start the preheat of the house.
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 120
+          unit_of_measurement: minutes
+
+# If motion is detected within the delay,
+# we restart the script.
+mode: single
+max_exceeded: silent
+
+trigger:
+  platform: state
+  entity_id: !input wake_up_datetime_entity
+
+action:
+  - variables:
+      sleep_offset_var: !input sleep_offset
+      preheat_offset_var: !input gentle_wakeup_offset
+      gentle_wakeup_offset_var: !input preheat_offset
+  - alias: "Set the sleep time plus the set offset"
+    service: input_datetime.set_datetime
+    data:
+      timestamp: "{{ (now() | as_timestamp + ( sleep_offset_var * 60 )) }}"
+    target:
+      entity_id: !input sleep_time_target
+  - alias: "Set the pre-heat time minus the offset"
+    service: input_datetime.set_datetime
+    data:
+      timestamp:
+        "{{ states('input_datetime.wake_up') | as_timestamp - preheat_offset_var
+        * 60 }}"
+    target:
+      entity_id: !input preheat_time_target
+  - alias: "Set the gentle alarm start time."
+    service: input_datetime.set_datetime
+    data:
+      timestamp:
+        "{{ states('input_datetime.wake_up') | as_timestamp - gentle_wakeup_offset_var
+        * 60 }}"
+    target:
+      entity_id: !input gentle_wakeup_time_target
